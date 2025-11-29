@@ -35,7 +35,13 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-const ChartCard = ({ title, children, className = '' }: { title: string, children: React.ReactNode, className?: string }) => (
+interface ChartCardProps {
+  title: string;
+  children?: React.ReactNode;
+  className?: string;
+}
+
+const ChartCard = ({ title, children, className = '' }: ChartCardProps) => (
   <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm p-6 flex flex-col h-full ${className}`}>
       <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-6 flex justify-between items-center">
           {title}
