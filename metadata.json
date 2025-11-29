@@ -1,0 +1,5 @@
+{
+  "name": "AcademiML",
+  "description": "A professional-grade AutoML interface for React/Django/Flask/FastAPI. Features extensive visualization capabilities for ML/DL/NLP research without external AI dependencies.",
+  "requestFramePermissions": []
+}
