@@ -2,19 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom global styles */
 body {
   font-family: 'Inter', sans-serif;
-  background-color: #f8fafc; /* slate-50 */
-  color: #0f172a; /* slate-900 */
-  transition-property: background-color, color;
-  transition-duration: 300ms;
-}
-
-/* Smooth transitions */
-*, *::before, *::after {
-  transition-property: background-color, border-color, color, fill, stroke;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 200ms;
+  background-color: #f8fafc;
+  color: #0f172a;
 }
 
 /* Custom scrollbar */
