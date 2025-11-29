@@ -27,34 +27,48 @@ const DataAnalysisSection: React.FC<Props> = ({ dataset, isExpanded, onToggleExp
   const numericalCols = useMemo(() => dataset ? getNumericalColumns(dataset) : [], [dataset]);
   const categoricalCols = useMemo(() => dataset ? getCategoricalColumns(dataset) : [], [dataset]);
   
-  // Bug fix: Reset selected column if it doesn't exist in the new dataset
+  // Update state when dataset changes, but ensure safety during render
   useEffect(() => {
     if (dataset) {
-      if (!selectedColumn || !dataset.columns.find(c => c.name === selectedColumn)) {
+       // Only reset if the currently selected column no longer exists in the new dataset
+       const colExists = dataset.columns.find(c => c.name === selectedColumn);
+       if (!selectedColumn || !colExists) {
         if (numericalCols.length > 0) setSelectedColumn(numericalCols[0]);
         else if (categoricalCols.length > 0) setSelectedColumn(categoricalCols[0]);
+        else setSelectedColumn('');
       }
     } else {
         setSelectedColumn('');
     }
   }, [dataset, numericalCols, categoricalCols]);
 
-  // Determine chart type based on selected column type
-  const isNumerical = useMemo(() => numericalCols.includes(selectedColumn), [selectedColumn, numericalCols]);
+  // Bug Fix: Derive a "safe" column to use for calculations during this render cycle
+  // This prevents the component from trying to calculate stats for "Titanic/Fare" on "Iris" dataset
+  // before the useEffect above has a chance to update the state.
+  const activeColumn = useMemo(() => {
+      if (!dataset) return '';
+      const exists = dataset.columns.find(c => c.name === selectedColumn);
+      if (exists) return selectedColumn;
+      // Fallback immediate return
+      return numericalCols[0] || categoricalCols[0] || '';
+  }, [dataset, selectedColumn, numericalCols, categoricalCols]);
+
+  // Determine chart type based on active column type
+  const isNumerical = useMemo(() => numericalCols.includes(activeColumn), [activeColumn, numericalCols]);
 
   const chartData = useMemo(() => {
-    if (!dataset || !selectedColumn || vizType !== 'univariate') return [];
+    if (!dataset || !activeColumn || vizType !== 'univariate') return [];
     if (isNumerical) {
-      return calculateHistogram(dataset, selectedColumn);
+      return calculateHistogram(dataset, activeColumn);
     } else {
-      return calculateValueCounts(dataset, selectedColumn);
+      return calculateValueCounts(dataset, activeColumn);
     }
-  }, [dataset, selectedColumn, vizType, isNumerical]);
+  }, [dataset, activeColumn, vizType, isNumerical]);
 
   const columnStats = useMemo(() => {
-      if(!dataset || !selectedColumn) return null;
-      return calculateColumnStats(dataset, selectedColumn);
-  }, [dataset, selectedColumn]);
+      if(!dataset || !activeColumn) return null;
+      return calculateColumnStats(dataset, activeColumn);
+  }, [dataset, activeColumn]);
 
   const correlationData = useMemo(() => {
     if (!dataset || vizType !== 'bivariate') return [];
@@ -125,9 +139,9 @@ const DataAnalysisSection: React.FC<Props> = ({ dataset, isExpanded, onToggleExp
                         <div className="flex items-center gap-2 w-full sm:w-auto">
                             <label className="text-sm text-slate-500 whitespace-nowrap">Feature:</label>
                             <select 
-                                value={selectedColumn}
+                                value={activeColumn}
                                 onChange={(e) => setSelectedColumn(e.target.value)}
-                                className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 w-full"
+                                className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 w-full cursor-pointer"
                             >
                                 <optgroup label="Numerical">
                                 {numericalCols.map(c => <option key={c} value={c}>{c}</option>)}
@@ -140,44 +154,50 @@ const DataAnalysisSection: React.FC<Props> = ({ dataset, isExpanded, onToggleExp
                     </div>
                     
                     <div className="flex-1 h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} className="dark:opacity-10" />
-                        <XAxis 
-                            dataKey={isNumerical ? "range" : "name"} 
-                            stroke="#94a3b8" 
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                            dy={10}
-                            interval={0}
-                            tick={({ x, y, payload }) => (
-                                <g transform={`translate(${x},${y})`}>
-                                    <text x={0} y={0} dy={16} textAnchor="end" fill="#94a3b8" fontSize={10} transform="rotate(-25)">
-                                        {payload.value.length > 10 ? payload.value.substring(0, 10) + '...' : payload.value}
-                                    </text>
-                                </g>
-                            )}
-                            height={60}
-                        />
-                        <YAxis 
-                            stroke="#94a3b8" 
-                            fontSize={12} 
-                            tickLine={false}
-                            axisLine={false}
-                        />
-                        <Tooltip 
-                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: '#1e293b', color: '#fff' }}
-                            itemStyle={{ color: '#818cf8' }}
-                            cursor={{ fill: 'currentColor', opacity: 0.1 }}
-                        />
-                        <Bar dataKey={isNumerical ? "count" : "value"} name="Count" radius={[4, 4, 0, 0]}>
-                            {chartData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill="#6366f1" />
-                            ))}
-                        </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
+                    {chartData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} className="dark:opacity-10" />
+                            <XAxis 
+                                dataKey={isNumerical ? "range" : "name"} 
+                                stroke="#94a3b8" 
+                                fontSize={12}
+                                tickLine={false}
+                                axisLine={false}
+                                dy={10}
+                                interval={0}
+                                tick={({ x, y, payload }) => (
+                                    <g transform={`translate(${x},${y})`}>
+                                        <text x={0} y={0} dy={16} textAnchor="end" fill="#94a3b8" fontSize={10} transform="rotate(-25)">
+                                            {payload.value && payload.value.length > 10 ? payload.value.substring(0, 10) + '...' : payload.value}
+                                        </text>
+                                    </g>
+                                )}
+                                height={60}
+                            />
+                            <YAxis 
+                                stroke="#94a3b8" 
+                                fontSize={12} 
+                                tickLine={false}
+                                axisLine={false}
+                            />
+                            <Tooltip 
+                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: '#1e293b', color: '#fff' }}
+                                itemStyle={{ color: '#818cf8' }}
+                                cursor={{ fill: 'currentColor', opacity: 0.1 }}
+                            />
+                            <Bar dataKey={isNumerical ? "count" : "value"} name="Count" radius={[4, 4, 0, 0]}>
+                                {chartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill="#6366f1" />
+                                ))}
+                            </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="flex items-center justify-center h-full text-slate-400">
+                            No data available for this column.
+                        </div>
+                    )}
                     </div>
                 </div>
 
@@ -264,6 +284,7 @@ const DataAnalysisSection: React.FC<Props> = ({ dataset, isExpanded, onToggleExp
                       <div 
                         className="grid gap-1"
                         style={{ 
+                          // Fixed: Ensure the grid columns align with the sliced numerical columns
                           gridTemplateColumns: `auto repeat(${Math.min(numericalCols.length, 15)}, minmax(40px, 1fr))`,
                         }}
                       >
@@ -308,7 +329,7 @@ const DataAnalysisSection: React.FC<Props> = ({ dataset, isExpanded, onToggleExp
                    </div>
                  ) : (
                    <div className="flex items-center justify-center h-full text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-lg p-12">
-                     Insufficient numeric data for correlation.
+                     Insufficient numeric data (need at least 2 columns) for correlation.
                    </div>
                  )}
               </div>

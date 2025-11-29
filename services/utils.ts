@@ -11,6 +11,7 @@ export const parseCSV = (content: string, filename: string): Dataset => {
     headers.forEach((header, index) => {
       // Try to parse number
       const val = values[index];
+      // Check if it's a number and not an empty string
       const numVal = parseFloat(val);
       row[header] = !isNaN(numVal) && val !== '' ? numVal : val;
     });
@@ -21,8 +22,15 @@ export const parseCSV = (content: string, filename: string): Dataset => {
     const values = rawData.map(row => row[header]);
     const missingCount = values.filter(v => v === '' || v === null || v === undefined).length;
     const uniqueCount = new Set(values).size;
+    
+    // Determine type based on first non-null value
     const firstNonEmpty = values.find(v => v !== '' && v !== null && v !== undefined);
-    const type = typeof firstNonEmpty === 'number' ? 'number' : typeof firstNonEmpty === 'boolean' ? 'boolean' : 'string';
+    let type: 'number' | 'boolean' | 'string' = 'string';
+    
+    if (firstNonEmpty !== undefined) {
+        if (typeof firstNonEmpty === 'number') type = 'number';
+        else if (typeof firstNonEmpty === 'boolean') type = 'boolean';
+    }
     
     return {
       name: header,
@@ -51,12 +59,13 @@ export const getCategoricalColumns = (dataset: Dataset) => {
 };
 
 export const calculateHistogram = (dataset: Dataset, columnName: string, bins = 10) => {
-  const values = dataset.rows.map(r => r[columnName]).filter(v => typeof v === 'number');
+  const values = dataset.rows.map(r => r[columnName]).filter(v => typeof v === 'number' && !isNaN(v));
   if (values.length === 0) return [];
 
   const min = Math.min(...values);
   const max = Math.max(...values);
   
+  // Bug Fix: Handle case where all values are the same (Variance = 0)
   if (min === max) {
       return [{ range: min.toString(), count: values.length }];
   }
@@ -64,6 +73,7 @@ export const calculateHistogram = (dataset: Dataset, columnName: string, bins = 
   const range = max - min;
   const binSize = range / bins;
 
+  // Initialize bins
   const histogram = Array(bins).fill(0).map((_, i) => ({
     range: `${(min + i * binSize).toFixed(1)} - ${(min + (i + 1) * binSize).toFixed(1)}`,
     count: 0
@@ -72,6 +82,7 @@ export const calculateHistogram = (dataset: Dataset, columnName: string, bins = 
   values.forEach(v => {
     let binIndex = Math.floor((v - min) / binSize);
     if (binIndex >= bins) binIndex = bins - 1;
+    if (binIndex < 0) binIndex = 0; // Safety check
     histogram[binIndex].count++;
   });
 
@@ -81,8 +92,10 @@ export const calculateHistogram = (dataset: Dataset, columnName: string, bins = 
 export const calculateValueCounts = (dataset: Dataset, columnName: string, limit = 10) => {
   const counts: Record<string, number> = {};
   dataset.rows.forEach(r => {
-    const val = r[columnName] === null || r[columnName] === undefined ? 'Missing' : String(r[columnName]);
-    counts[val] = (counts[val] || 0) + 1;
+    let val = r[columnName];
+    if (val === null || val === undefined || val === '') val = 'Missing';
+    const strVal = String(val);
+    counts[strVal] = (counts[strVal] || 0) + 1;
   });
 
   return Object.entries(counts)
@@ -95,7 +108,9 @@ export const calculateColumnStats = (dataset: Dataset, columnName: string): Colu
     const col = dataset.columns.find(c => c.name === columnName);
     if (!col) return { missing: 0, unique: 0, type: 'unknown' };
 
-    const values = dataset.rows.map(r => r[columnName]).filter(v => v !== null && v !== undefined && v !== '');
+    const values = dataset.rows
+        .map(r => r[columnName])
+        .filter(v => v !== null && v !== undefined && v !== '');
     
     const stats: ColumnStats = {
         missing: col.missingCount,
@@ -126,6 +141,7 @@ export const calculateColumnStats = (dataset: Dataset, columnName: string): Colu
 export const calculateCorrelation = (x: number[], y: number[]) => {
   const n = x.length;
   if (n === 0) return 0;
+  
   const sumX = x.reduce((a, b) => a + b, 0);
   const sumY = y.reduce((a, b) => a + b, 0);
   const sumXY = x.reduce((sum, xi, i) => sum + xi * y[i], 0);
@@ -149,8 +165,15 @@ export const generateCorrelationMatrix = (dataset: Dataset) => {
     for (let j = 0; j < numericCols.length; j++) {
       const colA = numericCols[i];
       const colB = numericCols[j];
-      const valuesA = dataset.rows.map(r => r[colA] as number);
-      const valuesB = dataset.rows.map(r => r[colB] as number);
+      
+      // Filter out rows where either A or B is missing for calculation accuracy
+      const cleanRows = dataset.rows.filter(r => 
+        typeof r[colA] === 'number' && !isNaN(r[colA]) &&
+        typeof r[colB] === 'number' && !isNaN(r[colB])
+      );
+
+      const valuesA = cleanRows.map(r => r[colA] as number);
+      const valuesB = cleanRows.map(r => r[colB] as number);
       
       const corr = calculateCorrelation(valuesA, valuesB);
       matrix.push({ x: colA, y: colB, value: isNaN(corr) ? 0 : parseFloat(corr.toFixed(2)) });
