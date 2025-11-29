@@ -11,47 +11,6 @@ interface Props {
   result: TrainingResult | null;
 }
 
-const colors = {
-  primary: '#6366f1',    // Indigo 500
-  success: '#10b981',    // Emerald 500
-  danger: '#ef4444',     // Red 500
-  grid: '#334155',
-  text: '#94a3b8'
-};
-
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 shadow-lg rounded-lg z-50">
-        <p className="text-slate-900 dark:text-white font-semibold text-sm mb-1">{label}</p>
-        {payload.map((p: any, i: number) => (
-           <p key={i} className="text-xs" style={{ color: p.color }}>
-              {p.name}: {typeof p.value === 'number' ? p.value.toFixed(4) : p.value}
-           </p>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
-
-interface ChartCardProps {
-  title: string;
-  children?: React.ReactNode;
-  className?: string;
-}
-
-const ChartCard = ({ title, children, className = '' }: ChartCardProps) => (
-  <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm p-6 flex flex-col h-full ${className}`}>
-      <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-6 flex justify-between items-center">
-          {title}
-      </h3>
-      <div className="flex-grow min-h-[300px]">
-          {children}
-      </div>
-  </div>
-);
-
 const ResultsSection: React.FC<Props> = ({ result }) => {
   const [activeTab, setActiveTab] = useState<VizCategory>('ml');
   
@@ -85,6 +44,42 @@ const ResultsSection: React.FC<Props> = ({ result }) => {
   };
 
   if (!result) return null;
+
+  // --- Theme Colors ---
+  const colors = {
+    primary: '#6366f1',    // Indigo 500
+    success: '#10b981',    // Emerald 500
+    danger: '#ef4444',     // Red 500
+    grid: '#334155',
+    text: '#94a3b8'
+  };
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 shadow-lg rounded-lg z-50">
+          <p className="text-slate-900 dark:text-white font-semibold text-sm mb-1">{label}</p>
+          {payload.map((p: any, i: number) => (
+             <p key={i} className="text-xs" style={{ color: p.color }}>
+                {p.name}: {typeof p.value === 'number' ? p.value.toFixed(4) : p.value}
+             </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const ChartCard = ({ title, children, className = '' }: { title: string, children: React.ReactNode, className?: string }) => (
+    <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm p-6 flex flex-col h-full ${className}`}>
+        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-6 flex justify-between items-center">
+            {title}
+        </h3>
+        <div className="flex-grow min-h-[300px]">
+            {children}
+        </div>
+    </div>
+  );
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
